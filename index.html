@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Learn Bits</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172b42; background: #f1f5fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px 16px; }
+    main { max-width: 850px; margin: auto; }
+    h1 { margin-bottom: 6px; }
+    h2 { font-size: 1.15rem; }
+    p { line-height: 1.6; }
+    .muted { color: #50627a; }
+    .card { background: white; border: 1px solid #d4deeb; border-radius: 16px; padding: 22px; margin: 18px 0; }
+    .controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: end; }
+    label { display: grid; gap: 8px; font-weight: 600; }
+    input, select, button { font: inherit; }
+    input, select { padding: 10px; border: 1px solid #8a9bb1; border-radius: 7px; background: white; color: inherit; }
+    input { width: 110px; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #8c51dd; outline-offset: 3px; }
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .examples button { padding: 8px 12px; border: 1px solid #b4c7e0; border-radius: 7px; background: #f0f6ff; color: #174674; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: center; }
+    th, td { padding: 10px 5px; }
+    tbody th, thead th:first-child { text-align: left; white-space: nowrap; }
+    thead { color: #50627a; }
+    .bit { width: 38px; height: 42px; border: 1px solid #9bacbf; border-radius: 8px; background: #edf1f5; color: #43556d; font-weight: 700; font-family: monospace; font-size: 1.2rem; }
+    .on { background: #d2f5e6; color: #0c513b; border-color: #27916b; }
+    .result-bit { display: inline-grid; place-items: center; }
+    .result-row { border-top: 2px solid #ccd9e8; }
+    #answer { font-size: 1.7rem; margin: 0 0 12px; font-weight: 700; }
+    #error { color: #a21b28; font-weight: 600; }
+    code { background: #edf2f8; border-radius: 4px; padding: 2px 5px; }
+    .steps p { margin: 10px 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 520px) { .card { padding: 14px; } th, td { padding: 8px 3px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Learn Bits</h1>
+  <p class="muted">See how numbers become binary, then compare their bits one position at a time.</p>
+  <section class="card" aria-label="Calculator inputs">
+    <div class="controls">
+      <label>Number A<input id="a" type="number" min="0" max="15" step="1" value="5"></label>
+      <label>Operation<select id="operation"><option value="and">AND (&amp;)</option><option value="or">OR (|)</option></select></label>
+      <label>Number B<input id="b" type="number" min="0" max="15" step="1" value="7"></label>
+      <label>Display<select id="width"><option value="4">4 bits (0-15)</option><option value="8">8 bits (0-255)</option></select></label>
+    </div>
+    <p id="error" role="alert" hidden></p>
+    <div class="examples" aria-label="Examples">
+      <button type="button" data-a="5" data-b="7" data-op="and">Try 5 &amp; 7</button>
+      <button type="button" data-a="3" data-b="4" data-op="and">Try 3 &amp; 4</button>
+      <button type="button" data-a="1" data-b="2" data-op="or">Try 1 | 2</button>
+      <button type="button" data-a="13" data-b="15" data-op="and">Explore 13 in binary</button>
+    </div>
+  </section>
+  <section id="output" class="card" aria-label="Calculation result" aria-live="polite">
+    <p id="answer"></p>
+    <p id="rule"></p>
+    <p class="muted">Click a bit in row A or B to turn it on or off. Green means 1 (ON); gray means 0 (OFF).</p>
+    <div class="scroll"><table id="bits"></table></div>
+    <div class="steps">
+      <h2>Why these numbers?</h2>
+      <p id="explain-a"></p>
+      <p id="explain-b"></p>
+      <p id="explain-result"></p>
+      <h2>Checking the result in C</h2>
+      <p id="c-example"></p>
+      <p id="if-explanation"></p>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Reading binary</h2>
+    <p>Each position has a value: <strong>8, 4, 2, 1</strong> for four bits. Add a position's value only when its bit is <strong>1</strong>. For example, <code>1101</code> means <strong>8 + 4 + 1 = 13</strong>.</p>
+    <p><strong>AND (&amp;):</strong> both bits must be 1.<br><strong>OR (|):</strong> at least one bit must be 1.</p>
+    <p class="muted">This learning calculator accepts unsigned whole numbers only. It runs entirely in your browser; nothing is uploaded.</p>
+  </section>
+</main>
+<script>
+  "use strict";
+  const aInput = document.getElementById("a");
+  const bInput = document.getElementById("b");
+  const widthInput = document.getElementById("width");
+  const operationInput = document.getElementById("operation");
+  const error = document.getElementById("error");
+  const output = document.getElementById("output");
+
+  function calculate(a, b, operation) {
+    return operation === "and" ? a & b : a | b;
+  }
+
+  function explain(label, value, width) {
+    const parts = [];
+    for (let bit = width - 1; bit >= 0; bit--) {
+      if (value & (1 << bit)) parts.push(1 << bit);
+    }
+    return `${label}: ${value.toString(2).padStart(width, "0")} = ${parts.length ? parts.join(" + ") : "0 (no bits are ON)"} = ${value}.`;
+  }
+
+  function render() {
+    const width = Number(widthInput.value);
+    const maximum = (1 << width) - 1;
+    aInput.max = bInput.max = String(maximum);
+    const a = aInput.valueAsNumber;
+    const b = bInput.valueAsNumber;
+    const valid = [a, b].every(value => Number.isInteger(value) && value >= 0 && value <= maximum);
+    error.hidden = valid;
+    output.hidden = !valid;
+    aInput.setAttribute("aria-invalid", String(!aInput.validity.valid || !Number.isInteger(a)));
+    bInput.setAttribute("aria-invalid", String(!bInput.validity.valid || !Number.isInteger(b)));
+    if (!valid) {
+      error.textContent = `Enter a whole number from 0 to ${maximum} in both boxes. Values are not wrapped or truncated.`;
+      return;
+    }
+    const operation = operationInput.value;
+    const symbol = operation === "and" ? "&" : "|";
+    const result = calculate(a, b, operation);
+    document.getElementById("answer").textContent = `${a} ${symbol} ${b} = ${result}`;
+    document.getElementById("rule").textContent = operation === "and"
+      ? "AND: in each column, the result is 1 only when BOTH input bits are 1."
+      : "OR: in each column, the result is 1 when AT LEAST ONE input bit is 1.";
+    const weights = Array.from({length: width}, (_, index) => 1 << (width - 1 - index));
+    const table = document.getElementById("bits");
+    table.replaceChildren();
+    const head = table.createTHead().insertRow();
+    head.innerHTML = '<th scope="col">Position value</th>' + weights.map(weight => `<th scope="col">${weight}</th>`).join("");
+    const body = table.createTBody();
+    for (const [label, value, input] of [["A", a, aInput], ["B", b, bInput], ["Result", result, null]]) {
+      const row = body.insertRow();
+      if (!input) row.className = "result-row";
+      const heading = document.createElement("th");
+      heading.scope = "row";
+      heading.textContent = label;
+      row.append(heading);
+      for (const weight of weights) {
+        const enabled = Boolean(value & weight);
+        const cell = row.insertCell();
+        const element = document.createElement(input ? "button" : "span");
+        element.className = `bit${enabled ? " on" : ""}${input ? "" : " result-bit"}`;
+        element.textContent = enabled ? "1" : "0";
+        if (input) {
+          element.type = "button";
+          element.setAttribute("aria-label", `${label}, position value ${weight}`);
+          element.setAttribute("aria-pressed", String(enabled));
+          element.addEventListener("click", () => {
+            input.value = String(input.valueAsNumber ^ weight);
+            render();
+            table.querySelector(`button[aria-label="${label}, position value ${weight}"]`).focus();
+          });
+        }
+        cell.append(element);
+      }
+    }
+    document.getElementById("explain-a").textContent = explain("A", a, width);
+    document.getElementById("explain-b").textContent = explain("B", b, width);
+    document.getElementById("explain-result").textContent = explain("Result", result, width);
+    const code = document.createElement("code");
+    code.textContent = `printf("%d\\n", ${a} ${symbol} ${b});  // Prints ${result}`;
+    document.getElementById("c-example").replaceChildren(code);
+    document.getElementById("if-explanation").textContent =
+      `In C, if (${a} ${symbol} ${b}) evaluates to ${result}. ` +
+      (result === 0 ? "Zero means false, so the if block is skipped." : "Nonzero means true, so the if block runs.") +
+      " The condition decides whether the block runs, not what its printf prints.";
+  }
+
+  for (const input of [aInput, bInput, widthInput, operationInput]) input.addEventListener("input", render);
+  for (const button of document.querySelectorAll("[data-op]")) {
+    button.addEventListener("click", () => {
+      aInput.value = button.dataset.a;
+      bInput.value = button.dataset.b;
+      operationInput.value = button.dataset.op;
+      render();
+    });
+  }
+  render();
+</script>
+</body>
+</html>
